@@ -1,30 +1,31 @@
 package io.github.noeppi_noeppi.mods.bongo.task;
 
-import com.mojang.serialization.MapCodec;
+import com.google.common.collect.ImmutableSet;
+import com.mojang.blaze3d.vertex.PoseStack;
 import io.github.noeppi_noeppi.mods.bongo.BongoMod;
-import io.github.noeppi_noeppi.mods.bongo.render.RenderOverlay;
 import io.github.noeppi_noeppi.mods.bongo.util.ClientAdvancementInfo;
-import io.github.noeppi_noeppi.mods.bongo.util.Highlight;
 import io.github.noeppi_noeppi.mods.bongo.util.ItemRenderUtil;
 import io.github.noeppi_noeppi.mods.bongo.util.Util;
 import net.minecraft.advancements.Advancement;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiComponent;
+import net.minecraft.client.renderer.MultiBufferSource;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.TranslatableComponent;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.api.distmarker.OnlyIn;
-import net.minecraftforge.fml.DistExecutor;
 
 import javax.annotation.Nullable;
 import java.util.Comparator;
-import java.util.Objects;
+import java.util.Set;
+import java.util.function.Predicate;
 import java.util.stream.Stream;
 
-public class TaskTypeAdvancement implements TaskType<ResourceLocation> {
+public class TaskTypeAdvancement implements TaskTypeSimple<ResourceLocation> {
 
     public static final TaskTypeAdvancement INSTANCE = new TaskTypeAdvancement();
 
@@ -33,45 +34,75 @@ public class TaskTypeAdvancement implements TaskType<ResourceLocation> {
     }
 
     @Override
-    public String id() {
-        return "bongo.advancement";
-    }
-
-    @Override
-    public Class<ResourceLocation> taskClass() {
+    public Class<ResourceLocation> getTaskClass() {
         return ResourceLocation.class;
     }
 
     @Override
-    public MapCodec<ResourceLocation> codec() {
-        return ResourceLocation.CODEC.fieldOf("value");
+    public String getId() {
+        return "bongo.advancement";
     }
 
     @Override
-    public Component name() {
-        return Component.translatable("bongo.task.advancement.name");
+    public String getTranslationKey() {
+        return "bongo.task.advancement.name";
     }
 
     @Override
-    public Component contentName(ResourceLocation element, @Nullable MinecraftServer server) {
-        if (server != null) {
-            Advancement advancement = server.getAdvancements().getAdvancement(element);
-            if (advancement == null) {
-                return Component.translatable("bongo.task.advancement.invalid");
-            } else {
-                return advancement.getChatComponent();
-            }
+    public void renderSlot(Minecraft mc, PoseStack poseStack, MultiBufferSource buffer) {
+        poseStack.translate(-1, -1, 0);
+        poseStack.scale(20 / 26f, 20 / 26f, 1);
+        GuiComponent.blit(poseStack, 0, 0, 0, 18, 26, 26, 256, 256);
+    }
+
+    @Override
+    public void renderSlotContent(Minecraft mc, ResourceLocation content, PoseStack poseStack, MultiBufferSource buffer, boolean bigBongo) {
+        ItemStack icon = ClientAdvancementInfo.getDisplay(content);
+        ItemRenderUtil.renderItem(poseStack, buffer, icon, false);
+    }
+
+    @Override
+    public String getTranslatedContentName(ResourceLocation content) {
+        return ClientAdvancementInfo.getTranslation(content).getString(18);
+    }
+
+    @Override
+    public Component getContentName(ResourceLocation content, MinecraftServer server) {
+        Advancement advancement = server.getAdvancements().getAdvancement(content);
+        if (advancement == null) {
+            return new TranslatableComponent("bongo.task.advancement.invalid");
         } else {
-            return DistExecutor.unsafeRunForDist(
-                    () -> () -> ClientAdvancementInfo.getTranslation(element),
-                    () -> () -> Component.translatable("bongo.task.advancement.invalid")
-            );
+            return advancement.getChatComponent();
         }
     }
 
     @Override
-    public Comparator<ResourceLocation> order() {
-        return Util.COMPARE_RESOURCE;
+    public boolean shouldComplete(ResourceLocation element, Player player, ResourceLocation compare) {
+        return element.equals(compare);
+    }
+
+    @Override
+    public void syncToClient(ResourceLocation element, MinecraftServer server, @Nullable ServerPlayer syncTarget) {
+        Advancement advancement = server.getAdvancements().getAdvancement(element);
+        if (advancement != null) {
+            if (syncTarget == null) {
+                BongoMod.getNetwork().syncAdvancement(advancement);
+            } else {
+                BongoMod.getNetwork().syncAdvancementTo(advancement, syncTarget);
+            }
+        }
+    }
+
+    @Override
+    public CompoundTag serializeNBT(ResourceLocation element) {
+        CompoundTag nbt = new CompoundTag();
+        nbt.putString("advancement", element.toString());
+        return nbt;
+    }
+
+    @Override
+    public ResourceLocation deserializeNBT(CompoundTag nbt) {
+        return Util.getLocationFor(nbt, "advancement");
     }
 
     @Override
@@ -82,53 +113,27 @@ public class TaskTypeAdvancement implements TaskType<ResourceLocation> {
     }
 
     @Override
-    public void sync(ResourceLocation element, MinecraftServer server, @Nullable ServerPlayer target) {
-        Advancement advancement = server.getAdvancements().getAdvancement(element);
-        if (advancement != null) {
-            if (target == null) {
-                BongoMod.getNetwork().syncAdvancement(advancement);
-            } else {
-                BongoMod.getNetwork().syncAdvancementTo(advancement, target);
-            }
-        }
+    public Predicate<ItemStack> bongoTooltipStack(ResourceLocation element) {
+        return ClientAdvancementInfo.getTooltipItem(element);
     }
 
     @Override
-    public Stream<ResourceLocation> listElements(MinecraftServer server, @Nullable ServerPlayer player) {
+    public Set<ResourceLocation> bookmarkAdvancements(ResourceLocation element) {
+        return ImmutableSet.of(element);
+    }
+
+    @Nullable
+    @Override
+    public Comparator<ResourceLocation> getSorting() {
+        return Util.COMPARE_RESOURCE;
+    }
+
+    @Override
+    public Stream<ResourceLocation> getAllElements(MinecraftServer server, @Nullable ServerPlayer player) {
         if (player == null) {
-            return server.getAdvancements().getAllAdvancements().stream()
-                    .filter(adv -> adv.getDisplay() != null)
-                    .map(Advancement::getId);
+            return server.getAdvancements().getAllAdvancements().stream().filter(adv -> adv.getDisplay() != null).map(Advancement::getId);
         } else {
-            return server.getAdvancements().getAllAdvancements().stream()
-                    .filter(adv -> adv.getDisplay() != null)
-                    .filter(adv -> player.getAdvancements().getOrStartProgress(adv).isDone())
-                    .map(Advancement::getId);
+            return server.getAdvancements().getAllAdvancements().stream().filter(adv -> adv.getDisplay() != null).filter(adv -> player.getAdvancements().getOrStartProgress(adv).isDone()).map(Advancement::getId);
         }
-    }
-
-    @Override
-    public boolean shouldComplete(ServerPlayer player, ResourceLocation element, ResourceLocation compare) {
-        return Objects.equals(element, compare);
-    }
-
-    @Override
-    public Stream<Highlight<?>> highlight(ResourceLocation element) {
-        return Stream.of(new Highlight.Advancement(element));
-    }
-
-    @Override
-    @OnlyIn(Dist.CLIENT)
-    public void renderSlot(Minecraft mc, GuiGraphics graphics) {
-        graphics.pose().translate(-1, -1, 0);
-        graphics.pose().scale(20 / 26f, 20 / 26f, 1);
-        graphics.blit(RenderOverlay.BINGO_SLOTS_TEXTURE, 0, 0, 0, 18, 26, 26, 256, 256);
-    }
-
-    @Override
-    @OnlyIn(Dist.CLIENT)
-    public void renderSlotContent(Minecraft mc, GuiGraphics graphics, ResourceLocation element, boolean bigBongo) {
-        ItemStack icon = ClientAdvancementInfo.getDisplay(element);
-        ItemRenderUtil.renderItem(graphics, icon, false);
     }
 }

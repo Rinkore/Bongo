@@ -1,20 +1,20 @@
 package io.github.noeppi_noeppi.mods.bongo.task;
 
-import com.mojang.serialization.MapCodec;
+import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.renderer.MultiBufferSource;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.TextComponent;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.Unit;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.api.distmarker.OnlyIn;
+import net.minecraft.world.entity.player.Player;
 
 import javax.annotation.Nullable;
-import java.util.Comparator;
 import java.util.stream.Stream;
 
-public class TaskTypeEmpty implements TaskType<Unit> {
+public class TaskTypeEmpty implements TaskType<Unit, Void> {
 
     public static final TaskTypeEmpty INSTANCE = new TaskTypeEmpty();
 
@@ -23,54 +23,67 @@ public class TaskTypeEmpty implements TaskType<Unit> {
     }
 
     @Override
-    public String id() {
-        return "bongo.empty";
-    }
-
-    @Override
-    public Class<Unit> taskClass() {
+    public Class<Unit> getTaskClass() {
         return Unit.class;
     }
 
     @Override
-    public MapCodec<Unit> codec() {
-        return MapCodec.unit(Unit.INSTANCE);
+    public Class<Void> getCompareClass() {
+        return Void.class;
     }
 
     @Override
-    public Component name() {
-        return Component.literal("Empty");
+    public String getId() {
+        return "bongo.empty";
     }
 
     @Override
-    public Component contentName(Unit element, @Nullable MinecraftServer server) {
-        return Component.empty();
+    public String getTranslatedName() {
+        return "Empty";
     }
 
     @Override
-    public Comparator<Unit> order() {
-        return Comparator.comparing(Unit::ordinal);
+    public String getTranslationKey() {
+        return "Empty";
     }
 
     @Override
-    public Stream<Unit> listElements(MinecraftServer server, @Nullable ServerPlayer player) {
-        return Stream.of(Unit.INSTANCE);
+    public void renderSlot(Minecraft mc, PoseStack poseStack, MultiBufferSource buffer) {
+
     }
 
     @Override
-    public boolean shouldComplete(ServerPlayer player, Unit element, Unit compare) {
+    public void renderSlotContent(Minecraft mc, Unit content, PoseStack poseStack, MultiBufferSource buffer, boolean bigBongo) {
+
+    }
+
+    @Override
+    public String getTranslatedContentName(Unit content) {
+        return "";
+    }
+
+    @Override
+    public Component getContentName(Unit content, MinecraftServer server) {
+        return new TextComponent("");
+    }
+
+    @Override
+    public boolean shouldComplete(Unit element, Player player, Void compare) {
         return false;
     }
 
     @Override
-    @OnlyIn(Dist.CLIENT)
-    public void renderSlot(Minecraft mc, GuiGraphics graphics) {
-        //
+    public CompoundTag serializeNBT(Unit element) {
+        return new CompoundTag();
     }
 
     @Override
-    @OnlyIn(Dist.CLIENT)
-    public void renderSlotContent(Minecraft mc, GuiGraphics graphics, Unit element, boolean bigBongo) {
-        //
+    public Unit deserializeNBT(CompoundTag nbt) {
+        return Unit.INSTANCE;
+    }
+
+    @Override
+    public Stream<Unit> getAllElements(MinecraftServer server, @Nullable ServerPlayer player) {
+        return Stream.of(Unit.INSTANCE);
     }
 }

@@ -6,6 +6,7 @@ import io.github.noeppi_noeppi.mods.bongo.data.Team;
 import io.github.noeppi_noeppi.mods.minemention.api.SpecialMention;
 import io.github.noeppi_noeppi.mods.minemention.api.SpecialMentions;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.TranslatableComponent;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 
@@ -25,13 +26,13 @@ public class MineMentionIntegration {
 
         @Override
         public Component description() {
-            return Component.translatable("bongo.mention");
+            return new TranslatableComponent("bongo.mention");
         }
 
         @Override
         public Predicate<ServerPlayer> selectPlayers(ServerPlayer sender) {
             return player -> {
-                Bongo bongo = Bongo.get(sender.level());
+                Bongo bongo = Bongo.get(sender.getLevel());
                 Team team = bongo.getTeam(sender);
                 return team != null && team.hasPlayer(player);
             };
@@ -39,7 +40,7 @@ public class MineMentionIntegration {
 
         @Override
         public boolean available(ServerPlayer sender) {
-            Bongo bongo = Bongo.get(sender.level());
+            Bongo bongo = Bongo.get(sender.getLevel());
             return bongo.active() && bongo.getTeam(sender) != null;
         }
     }

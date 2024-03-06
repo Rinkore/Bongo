@@ -1,44 +1,87 @@
 package io.github.noeppi_noeppi.mods.bongo.task;
 
-import com.mojang.serialization.MapCodec;
-import io.github.noeppi_noeppi.mods.bongo.util.Highlight;
+import com.google.common.collect.ImmutableSet;
+import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.renderer.MultiBufferSource;
+import net.minecraft.client.resources.language.I18n;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.util.FormattedCharSequence;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
-import org.moddingx.libx.util.game.ComponentUtil;
 
 import javax.annotation.Nullable;
 import java.util.Comparator;
+import java.util.Set;
+import java.util.function.Predicate;
 import java.util.stream.Stream;
 
-public interface TaskType<T> {
+public interface TaskType<T, C> {
 
-    String id();
-    Class<T> taskClass();
-    MapCodec<T> codec();
-    Component name();
-    Component contentName(T element, @Nullable MinecraftServer server);
-    Comparator<T> order();
+    Class<T> getTaskClass();
     
-    default void validate(T element, MinecraftServer server) {}
-    default void sync(T element, MinecraftServer server, @Nullable ServerPlayer target) {}
-    Stream<T> listElements(MinecraftServer server, @Nullable ServerPlayer player);
-    
-    boolean shouldComplete(ServerPlayer player, T element, T compare);
-    default void consume(ServerPlayer player, T element, T found) {}
-    default Stream<Highlight<?>> highlight(T element) { return Stream.empty(); }
-    default void invalidate(T element) {}
-    
+    Class<C> getCompareClass();
+
+    String getId();
+
+    default String getTranslatedName() {
+        return I18n.get(getTranslationKey());
+    }
+
+    String getTranslationKey();
+
+    void renderSlot(Minecraft mc, PoseStack poseStack, MultiBufferSource buffer);
+
+    void renderSlotContent(Minecraft mc, T content, PoseStack poseStack, MultiBufferSource buffer, boolean bigBongo);
+
     @OnlyIn(Dist.CLIENT)
-    default FormattedCharSequence renderDisplayName(Minecraft mc, T element) {
-        return ComponentUtil.subSequence(this.contentName(element, null).getVisualOrderText(), 0, 16);
+    String getTranslatedContentName(T content);
+
+    Component getContentName(T content, MinecraftServer server);
+
+    boolean shouldComplete(T element, Player player, C compare);
+
+    CompoundTag serializeNBT(T element);
+
+    T deserializeNBT(CompoundTag nbt);
+    
+    default void validate(T element, MinecraftServer server) {
+        
+    }
+
+    default T copy(T element) {
+        return element;
+    }
+
+    default void syncToClient(T element, MinecraftServer server, @Nullable ServerPlayer syncTarget) {
+
+    }
+
+    default Predicate<ItemStack> bongoTooltipStack(T element) {
+        return stack -> false;
     }
     
-    @OnlyIn(Dist.CLIENT) void renderSlot(Minecraft mc, GuiGraphics graphics);
-    @OnlyIn(Dist.CLIENT) void renderSlotContent(Minecraft mc, GuiGraphics graphics, T element, boolean bigBongo);
+    default Set<ItemStack> bookmarkStacks(T element) {
+        return ImmutableSet.of();
+    }
+    
+    default Set<ResourceLocation> bookmarkAdvancements(T element) {
+        return ImmutableSet.of();
+    }
+
+    default void consumeItem(T element, C found, Player player) {
+
+    }
+
+    @Nullable
+    default Comparator<T> getSorting() {
+        return null;
+    }
+
+    Stream<T> getAllElements(MinecraftServer server, @Nullable ServerPlayer player);
 }

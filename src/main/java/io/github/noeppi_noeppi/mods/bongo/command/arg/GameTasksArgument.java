@@ -5,13 +5,14 @@ import com.mojang.brigadier.StringReader;
 import com.mojang.brigadier.arguments.ArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import com.mojang.brigadier.exceptions.SimpleCommandExceptionType;
 import com.mojang.brigadier.suggestion.Suggestions;
 import com.mojang.brigadier.suggestion.SuggestionsBuilder;
-import io.github.noeppi_noeppi.mods.bongo.data.task.GameTasks;
-import net.minecraft.commands.CommandBuildContext;
+import io.github.noeppi_noeppi.mods.bongo.data.GameTasks;
 import net.minecraft.commands.arguments.ResourceLocationArgument;
-import net.minecraft.commands.synchronization.ArgumentTypeInfo;
+import net.minecraft.commands.synchronization.ArgumentSerializer;
 import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.chat.TranslatableComponent;
 import net.minecraft.resources.ResourceLocation;
 
 import javax.annotation.Nonnull;
@@ -19,14 +20,14 @@ import javax.annotation.Nullable;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 
-public class GameTasksArgument implements ArgumentType<ResourceLocation> {
+public class GameTasksArgument implements ArgumentType<GameTasks> {
 
     @Nullable
-    private final Set<ResourceLocation> games;
+    private final Map<ResourceLocation, GameTasks> games;
 
     private final ResourceLocationArgument rla = new ResourceLocationArgument();
 
-    public GameTasksArgument(@Nullable Set<ResourceLocation> games) {
+    public GameTasksArgument(@Nullable Map<ResourceLocation, GameTasks> games) {
         this.games = games;
     }
 
@@ -34,15 +35,20 @@ public class GameTasksArgument implements ArgumentType<ResourceLocation> {
         return new GameTasksArgument(null);
     }
 
-    public ResourceLocation parse(StringReader reader) throws CommandSyntaxException {
-        return rla.parse(reader);
+    public GameTasks parse(StringReader reader) throws CommandSyntaxException {
+        ResourceLocation rl = rla.parse(reader);
+        GameTasks gt = games().get(rl);
+        if (gt == null) {
+            throw new SimpleCommandExceptionType(new TranslatableComponent("bongo.cmd.create.notfound")).create();
+        }
+        return gt;
     }
 
     public <S> CompletableFuture<Suggestions> listSuggestions(CommandContext<S> context, SuggestionsBuilder builder) {
         StringReader reader = new StringReader(context.getInput());
         reader.setCursor(builder.getStart());
         String theString = reader.getRemaining().toLowerCase();
-        for (ResourceLocation rl : games()) {
+        for (ResourceLocation rl : games().keySet()) {
             if (rl.toString().toLowerCase().startsWith(theString))
                 builder.suggest(rl.toString());
         }
@@ -51,74 +57,42 @@ public class GameTasksArgument implements ArgumentType<ResourceLocation> {
 
     public Collection<String> getExamples() {
         List<String> examples = new ArrayList<>();
-        for (ResourceLocation rl : games())
+        for (ResourceLocation rl : games().keySet())
             examples.add(rl.toString());
         return examples;
     }
 
-    private Set<ResourceLocation> games() {
-        return games == null ? GameTasks.gameTasks().keySet() : games;
+    private Map<ResourceLocation, GameTasks> games() {
+        return games == null ? GameTasks.GAME_TASKS : games;
     }
 
-    public static class Info implements ArgumentTypeInfo<GameTasksArgument, GameTasksArgument.Info.Template> {
-
-        public static final GameTasksArgument.Info INSTANCE = new GameTasksArgument.Info();
-
-        private Info() {
-
-        }
+    public static class Serializer implements ArgumentSerializer<GameTasksArgument> {
 
         @Override
-        public void serializeToNetwork(@Nonnull GameTasksArgument.Info.Template template, @Nonnull FriendlyByteBuf buffer) {
-            buffer.writeInt(template.argument.games().size());
-            for (ResourceLocation id : template.argument.games()) {
-                buffer.writeResourceLocation(id);
+        public void serializeToNetwork(GameTasksArgument argument, FriendlyByteBuf buffer) {
+            buffer.writeInt(argument.games().size());
+            for (GameTasks gt : argument.games().values()) {
+                buffer.writeResourceLocation(gt.id);
+                buffer.writeNbt(gt.getTag());
             }
         }
 
         @Nonnull
         @Override
-        public GameTasksArgument.Info.Template deserializeFromNetwork(@Nonnull FriendlyByteBuf buffer) {
+        public GameTasksArgument deserializeFromNetwork(@Nonnull FriendlyByteBuf buffer) {
             int amount = buffer.readInt();
-            Set<ResourceLocation> ids = new HashSet<>();
-            for (int i = 0; i < amount; i++) {
-                ids.add(buffer.readResourceLocation());
+            Map<ResourceLocation, GameTasks> defs = new HashMap<>();
+            for (int i = 0;i < amount; i++) {
+                ResourceLocation id = buffer.readResourceLocation();
+                defs.put(id, new GameTasks(id, buffer.readNbt()));
             }
-            return new GameTasksArgument.Info.Template(new GameTasksArgument(ids));
+            return new GameTasksArgument(defs);
         }
 
         @Override
-        public void serializeToJson(@Nonnull GameTasksArgument.Info.Template template, @Nonnull JsonObject json) {
-            for (ResourceLocation id : template.argument.games()) {
-                json.addProperty(id.toString(), id.toString());
-            }
-        }
-
-        @Nonnull
-        @Override
-        public GameTasksArgument.Info.Template unpack(@Nonnull GameTasksArgument argument) {
-            return new GameTasksArgument.Info.Template(argument);
-        }
-
-        public class Template implements ArgumentTypeInfo.Template<GameTasksArgument> {
-
-            private final GameTasksArgument argument;
-
-            private Template(GameTasksArgument argument) {
-                this.argument = argument;
-            }
-
-            @Nonnull
-            @Override
-            public ArgumentTypeInfo<GameTasksArgument, ?> type() {
-                return GameTasksArgument.Info.this;
-            }
-
-            @Nonnull
-            @Override
-            public GameTasksArgument instantiate(@Nonnull CommandBuildContext ctx) {
-                return this.argument;
-            }
+        public void serializeToJson(GameTasksArgument argument, @Nonnull JsonObject json) {
+            for (GameTasks gt : argument.games().values())
+                json.addProperty(gt.id.toString(), gt.id.toString());
         }
     }
 }

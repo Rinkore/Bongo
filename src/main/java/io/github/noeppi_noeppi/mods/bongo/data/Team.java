@@ -5,9 +5,9 @@ import io.github.noeppi_noeppi.mods.bongo.util.Util;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
-import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.network.chat.Style;
+import net.minecraft.network.chat.TranslatableComponent;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.DyeColor;
@@ -31,8 +31,6 @@ public class Team {
     private final List<UUID> players;
     private final ItemStackHandler backpack;
     
-    private TeamCompletion completion = null;
-    
     public Team(Bongo bongo, DyeColor color) {
         this.bongo = bongo;
         this.color = color;
@@ -44,7 +42,7 @@ public class Team {
     }
 
     public MutableComponent getName() {
-        return Component.translatable("bongo.team." + color.getSerializedName()).withStyle(Util.getTextFormatting(color));
+        return new TranslatableComponent("bongo.team." + color.getSerializedName()).withStyle(Util.getTextFormatting(color));
     }
 
     public Style getFormatting() {
@@ -57,31 +55,26 @@ public class Team {
 
     public void complete(int slot) {
         completed |= (1 << (slot % 25));
-        this.completion = null;
         bongo.setDirty();
     }
     
+    public int completionAmount() {
+        int completed = 0;
+        for (int i = 0 ; i < 25; i++) {
+            completed += completed(i) ? 1 : 0;
+        }
+        return completed;
+    }
+
     public boolean locked(int slot) {
         return (locked & (1 << (slot % 25))) > 0;
     }
 
     public void lock(int slot) {
         locked |= (1 << (slot % 25));
-        this.completion = null;
         bongo.setDirty();
     }
 
-    public TeamCompletion completion() {
-        if (this.completion == null) {
-            this.completion = new TeamCompletion(this.bongo, this);
-        }
-        return this.completion;
-    }
-
-    public boolean isEmpty() {
-        return players.isEmpty();
-    }
-    
     public List<UUID> getPlayers() {
         return Collections.unmodifiableList(players);
     }
@@ -205,8 +198,6 @@ public class Team {
         } else {
             backpack.deserializeNBT(new CompoundTag());
         }
-        
-        this.completion = null;
     }
 
     public void reset(boolean suppressBingoSync) {
@@ -217,7 +208,6 @@ public class Team {
         teleportsLeft = 0;
         redeemedEmergency = false;
         clearBackPack(true);
-        this.completion = null;
         bongo.setChanged(suppressBingoSync);
     }
 
@@ -227,13 +217,11 @@ public class Team {
 
     public void resetCompleted(boolean suppressBingoSync) {
         completed = 0;
-        this.completion = null;
         bongo.setChanged(suppressBingoSync);
     }
 
     public void resetLocked(boolean suppressBingoSync) {
         locked = 0;
-        this.completion = null;
         bongo.setChanged(suppressBingoSync);
     }
 

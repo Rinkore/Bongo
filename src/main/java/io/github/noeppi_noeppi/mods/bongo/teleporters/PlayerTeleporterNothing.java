@@ -19,7 +19,7 @@ public class PlayerTeleporterNothing implements PlayerTeleporter {
     }
 
     @Override
-    public String id() {
+    public String getId() {
         return "bongo.no_tp";
     }
 
@@ -31,7 +31,7 @@ public class PlayerTeleporterNothing implements PlayerTeleporter {
         }
         BlockPos pos = mpos.immutable().above();
         players.forEach(player -> {
-            if (player.level() != gameLevel) {
+            if (player.level != gameLevel) {
                 player.teleportTo(gameLevel, center.getX() + 0.5, pos.getY(), center.getZ() + 0.5, player.getYHeadRot(), 0);
             }
             player.setRespawnPosition(gameLevel.dimension(), player.blockPosition(), 0, true, false);

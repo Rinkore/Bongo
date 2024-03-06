@@ -1,60 +1,50 @@
 package io.github.noeppi_noeppi.mods.bongo.util;
 
 import com.google.common.collect.ImmutableList;
-import com.mojang.datafixers.util.Either;
+import io.github.noeppi_noeppi.libx.util.Misc;
 import io.github.noeppi_noeppi.mods.bongo.Bongo;
+import io.github.noeppi_noeppi.mods.bongo.BongoMod;
 import io.github.noeppi_noeppi.mods.bongo.data.Team;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
-import net.minecraft.core.Holder;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.MutableComponent;
-import net.minecraft.network.chat.Style;
-import net.minecraft.network.chat.TextColor;
+import net.minecraft.nbt.Tag;
+import net.minecraft.network.chat.*;
 import net.minecraft.network.protocol.game.ClientboundSoundPacket;
-import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.DyeColor;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraftforge.registries.ForgeRegistries;
+import net.minecraftforge.registries.IForgeRegistry;
+import net.minecraftforge.registries.IForgeRegistryEntry;
 
 import javax.annotation.Nullable;
-import java.util.*;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.function.Predicate;
 
 public class Util {
 
-    public static final Component REQUIRED_ITEM = Component.translatable("bongo.tooltip.required").withStyle(ChatFormatting.GOLD);
-    public static final Comparator<ResourceLocation> COMPARE_RESOURCE = Comparator.nullsFirst(Comparator.comparing(ResourceLocation::getNamespace).thenComparing(ResourceLocation::getPath));
+    public static final Component REQUIRED_ITEM = new TranslatableComponent("bongo.tooltip.required").withStyle(ChatFormatting.GOLD);
+    public static final Comparator<ResourceLocation> COMPARE_RESOURCE = Comparator.comparing(ResourceLocation::getNamespace).thenComparing(ResourceLocation::getPath);
 
     public static final List<DyeColor> PREFERRED_COLOR_ORDER = ImmutableList.of(
-            DyeColor.YELLOW, DyeColor.LIME, DyeColor.LIGHT_BLUE, DyeColor.PINK, DyeColor.CYAN,
-            DyeColor.ORANGE, DyeColor.RED, DyeColor.GREEN, DyeColor.BLUE, DyeColor.PURPLE,
+            DyeColor.ORANGE, DyeColor.LIME, DyeColor.LIGHT_BLUE, DyeColor.PINK, DyeColor.CYAN,
+            DyeColor.YELLOW, DyeColor.RED, DyeColor.GREEN, DyeColor.BLUE, DyeColor.PURPLE,
             DyeColor.GRAY, DyeColor.MAGENTA, DyeColor.BLACK, DyeColor.WHITE, DyeColor.BROWN,
             DyeColor.LIGHT_GRAY
     );
 
     private static final Map<DyeColor, TextColor> COLOR_CACHE = new HashMap<>();
 
-    public static String resourceStr(ResourceLocation rl) {
-        if ("minecraft".equals(rl.getNamespace())) {
-            return rl.getPath();
-        } else {
-            return rl.toString();
-        }
-    }
-    
     public static Style getTextFormatting(@Nullable DyeColor color) {
         if (color == null) {
             return Style.EMPTY.applyFormat(ChatFormatting.RESET);
@@ -74,7 +64,7 @@ public class Util {
         if (server != null) {
             server.getPlayerList().getPlayers().forEach(player -> {
                 if (team.hasPlayer(player))
-                    player.sendSystemMessage(message);
+                    player.sendMessage(message, player.getUUID());
             });
         }
     }
@@ -108,29 +98,38 @@ public class Util {
     }
 
     public static boolean validSpawn(Level level, BlockPos pos) {
-        return canRespawnIn(level.getBlockState(pos)) && canRespawnIn(level.getBlockState(pos.above()))
+        return level.getBlockState(pos).getBlock().isPossibleToRespawnInThis()
+                && level.getBlockState(pos.above()).getBlock().isPossibleToRespawnInThis()
                 && level.getBlockState(pos.below()).isFaceSturdy(level, pos, Direction.UP);
     }
-    
-    private static boolean canRespawnIn(BlockState state) {
-        return state.getBlock().isPossibleToRespawnInThis(state);
-    }
-    
-    public static Optional<ResourceLocation> biome(ServerLevel level, BlockPos pos) {
-        return join(level.getBiome(pos).unwrap()
-                .mapLeft(ResourceKey::location)
-                .mapLeft(Optional::of)
-                .mapRight(ForgeRegistries.BIOMES::getKey)
-                .mapRight(Optional::ofNullable));
-    }
-    
-    public static <T> T join(Either<? extends T, ? extends T> either) {
-        if (either.left().isPresent()) {
-            return either.left().get();
-        } else {
-            //noinspection OptionalGetWithoutIsPresent
-            return either.right().get();
+
+    public static ResourceLocation getLocationFor(CompoundTag nbt, String id) {
+        if (!nbt.contains(id, Tag.TAG_STRING)) {
+            throw new IllegalStateException("Resource property for " + id + " missing or not a string.");
         }
+        ResourceLocation rl = ResourceLocation.tryParse(nbt.getString(id));
+        if (rl == null) {
+            throw new IllegalStateException("Invalid " + id + " resource location: '" + nbt.getString(id) + "'");
+        }
+        return rl;
+    }
+
+    public static <T extends IForgeRegistryEntry<T>> T getFromRegistry(IForgeRegistry<T> registry, CompoundTag nbt, String id) {
+        ResourceLocation rl = getLocationFor(nbt, id);
+        T element = registry.getValue(rl);
+        if (element == null) {
+            throw new IllegalStateException("Unknown " + id + ": " + rl);
+        }
+        return element;
+    }
+
+    public static <T extends IForgeRegistryEntry<T>> void putByForgeRegistry(IForgeRegistry<T> registry, CompoundTag nbt, String id, T element) {
+        ResourceLocation rl = registry.getKey(element);
+        if (rl == null) {
+            BongoMod.getInstance().logger.warn("Failed to serialise " + id + " location: Not found in forge registry: " + element);
+            rl = Misc.MISSIGNO;
+        }
+        nbt.putString(id, rl.toString());
     }
 
     public static void removeItems(Player player, int amount, Predicate<ItemStack> test) {
@@ -150,23 +149,19 @@ public class Util {
     }
     
     public static void handleTaskLocking(Bongo bongo, Player player) {
-        if (bongo.running() && bongo.getSettings().game().lockTaskOnDeath()) {
+        if (bongo.running() && bongo.getSettings().lockTaskOnDeath) {
             Team team = bongo.getTeam(player);
             if (team != null && team.lockRandomTask()) {
-                MutableComponent tc = Component.translatable("bongo.task_locked.death", player.getDisplayName());
-                if (player instanceof ServerPlayer serverPlayer) {
-                    serverPlayer.serverLevel().getServer().getPlayerList().getPlayers().forEach(thePlayer -> {
+                MutableComponent tc = new TranslatableComponent("bongo.task_locked.death", player.getDisplayName());
+                if (player instanceof ServerPlayer) {
+                    ((ServerPlayer) player).getLevel().getServer().getPlayerList().getPlayers().forEach(thePlayer -> {
                         if (team.hasPlayer(thePlayer)) {
-                            thePlayer.sendSystemMessage(tc);
-                            thePlayer.connection.send(new ClientboundSoundPacket(sound(SoundEvents.ANVIL_LAND), SoundSource.MASTER, thePlayer.getX(), thePlayer.getY(), thePlayer.getZ(), 1f, 1, 0));
+                            thePlayer.sendMessage(tc, thePlayer.getUUID());
+                            thePlayer.connection.send(new ClientboundSoundPacket(SoundEvents.ANVIL_LAND, SoundSource.MASTER, thePlayer.getX(), thePlayer.getY(), thePlayer.getZ(), 1f, 1));
                         }
                     });
                 }
             }
         }
-    }
-    
-    public static Holder<SoundEvent> sound(SoundEvent event) {
-        return ForgeRegistries.SOUND_EVENTS.getHolder(event).orElseGet(() -> Holder.direct(event));
     }
 }

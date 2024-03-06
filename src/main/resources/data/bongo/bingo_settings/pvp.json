@@ -1,32 +1,33 @@
 {
-  "game": {
-    "win_condition": "bongo.default",
-    "invulnerable": false,
-    "pvp": true,
-    "friendly_fire": false,
-    "lock_task_on_death": true,
-    "teleports_per_team": 1
-  },
-  "level": {
-    "teleporter": "bongo.no_tp"
-  },
-  "equipment": {
-    "inventory": [
-      {
-        "item": "minecraft:stone_sword"
-      }
-    ],
-    "head": {
-      "item": "minecraft:leather_helmet"
+  "invulnerable": false,
+  "winCondition": "bongo.default",
+  "friendlyFire": false,
+  "lockTaskOnDeath": true,
+  "teleportsPerTeam": 1,
+  "consumeItems": false,
+  "pvp": true,
+  "maxTime": -1,
+  "startingInventory": [
+    {
+      "id": "minecraft:leather_helmet",
+      "Slot": "head"
     },
-    "chest": {
-      "item": "minecraft:leather_chestplate"
+    {
+      "id": "minecraft:leather_chestplate",
+      "Slot": "chest"
     },
-    "legs": {
-      "item": "minecraft:leather_leggings"
+    {
+      "id": "minecraft:leather_leggings",
+      "Slot": "legs"
     },
-    "feet": {
-      "item": "minecraft:leather_boots"
+    {
+      "id": "minecraft:leather_boots",
+      "Slot": "feet"
+    },
+    {
+      "id": "minecraft:stone_sword"
     }
-  }
+  ],
+  "backpackInventory": [],
+  "teleporter": "bongo.no_tp"
 }
