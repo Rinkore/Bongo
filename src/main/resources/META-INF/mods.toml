@@ -6,10 +6,10 @@ license="Apache-2.0"
 [[mods]]
 modId="bongo"
 version="${file.jarVersion}"
-displayName="Bongo"
+displayName="Bongo-unofficial"
 displayURL="https://www.curseforge.com/minecraft/mc-mods/bongo"
 updateJSONURL="https://assets.melanx.de/updates/bongo.json"
-authors="noeppi_noeppi"
+authors="rinkore"
 description='''
 It's a bingo mod.
 '''
