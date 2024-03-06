@@ -7,11 +7,11 @@ license="Apache-2.0"
 modId="bongo"
 version="${file.jarVersion}"
 displayName="Bongo-unofficial"
-displayURL="https://www.curseforge.com/minecraft/mc-mods/bongo"
+displayURL="https://github.com/Rinkore/Bongo"
 updateJSONURL="https://assets.melanx.de/updates/bongo.json"
 authors="rinkore"
 description='''
-It's a bingo mod.
+It's a bingo mod forked by https://github.com/noeppi-noeppi/Bongo/tree/1.18.
 '''
 
 [[dependencies.bongo]]
