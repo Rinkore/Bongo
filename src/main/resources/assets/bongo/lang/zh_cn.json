@@ -88,6 +88,8 @@
   "bongo.wc.bongo.row_and_column": "一行和一列",
   "bongo.wc.bongo.rows": "一横行",
   "bongo.wc.bongo.rows_and_columns": "一行或一列",
+  "bongo.wc.bongo.thirteen": "任何13项任务",
+  "bongo.wc.bongo.lockout": "任何一条线或任何13项任务",
   "bongo.win": " 获胜！",
   "bongo.winplayers": " 获胜！成员："
 }
